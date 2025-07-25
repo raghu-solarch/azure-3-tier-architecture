@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 permissions:
-  id-token: write
+  id-token: write      # required for OIDC token exchange
   contents: read
   pull-requests: write
 
@@ -23,30 +23,31 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: '1.7.5'
 
-      # Authenticate to Azure using OIDC
-      - name: 'Login to Azure'
+      # Authenticate to Azure using federated credentials
+      - name: Login to Azure
         uses: azure/login@v1
         with:
           client-id:      ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id:      ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          auth-type: federated
 
-      - name: 'Terraform Init'
+      - name: Terraform Init
         run: terraform init -input=false -backend-config="key=${{ github.event.pull_request.head.ref }}.tfstate"
 
-      - name: 'Terraform Format'
+      - name: Terraform Format
         run: terraform fmt -check
 
-      - name: 'Terraform Validate'
+      - name: Terraform Validate
         run: terraform validate
 
-      - name: 'Terraform Plan'
+      - name: Terraform Plan
+        # Change the tfvars file here if you want plans against test or prod on other branches
         run: terraform plan -out=tfplan -var-file="env/dev.tfvars"
-        # Note: by default plan uses the dev configuration. In PRs you can override this if needed.
 
-      - name: 'Upload Plan'
+      - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
@@ -56,7 +57,6 @@ jobs:
     needs: tf-plan
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    # Map the branch name to an environment (dev, test, prod)
     environment: ${{ github.ref_name }}
     env:
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -67,23 +67,25 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: '1.7.5'
 
-      - name: 'Login to Azure'
+      # Authenticate using federated credentials (read/write client ID will be used if defined at environment level)
+      - name: Login to Azure
         uses: azure/login@v1
         with:
           client-id:      ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id:      ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          auth-type: federated
 
-      - name: 'Terraform Init'
+      - name: Terraform Init
         run: terraform init -input=false -backend-config="key=${{ github.ref_name }}.tfstate"
 
-      - name: 'Download Plan'
-        uses: actions/download-artifact@v3
+      - name: Download Plan
+        uses: actions/download-artifact@v4
         with:
           name: tfplan
 
-      - name: 'Terraform Apply'
+      - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
