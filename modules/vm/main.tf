@@ -51,7 +51,6 @@ resource "azurerm_linux_virtual_machine" "this" {
     version   = var.source_image.version
   }
 
-  ssh_keys = []  # we rely on password auth
   tags     = var.tags
 }
 
