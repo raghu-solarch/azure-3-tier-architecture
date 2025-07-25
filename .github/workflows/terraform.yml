@@ -1,0 +1,89 @@
+name: 'Terraform CI/CD'
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  tf-plan:
+    runs-on: ubuntu-latest
+    env:
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID:        ${{ secrets.AZURE_TENANT_ID }}
+      ARM_CLIENT_ID:        ${{ secrets.AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      # Authenticate to Azure using OIDC
+      - name: 'Login to Azure'
+        uses: azure/login@v1
+        with:
+          client-id:      ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:      ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 'Terraform Init'
+        run: terraform init -input=false -backend-config="key=${{ github.event.pull_request.head.ref }}.tfstate"
+
+      - name: 'Terraform Format'
+        run: terraform fmt -check
+
+      - name: 'Terraform Validate'
+        run: terraform validate
+
+      - name: 'Terraform Plan'
+        run: terraform plan -out=tfplan -var-file="env/dev.tfvars"
+        # Note: by default plan uses the dev configuration. In PRs you can override this if needed.
+
+      - name: 'Upload Plan'
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan
+          path: tfplan
+
+  tf-apply:
+    needs: tf-plan
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Map the branch name to an environment (dev, test, prod)
+    environment: ${{ github.ref_name }}
+    env:
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID:        ${{ secrets.AZURE_TENANT_ID }}
+      ARM_CLIENT_ID:        ${{ secrets.AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: 'Login to Azure'
+        uses: azure/login@v1
+        with:
+          client-id:      ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:      ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 'Terraform Init'
+        run: terraform init -input=false -backend-config="key=${{ github.ref_name }}.tfstate"
+
+      - name: 'Download Plan'
+        uses: actions/download-artifact@v3
+        with:
+          name: tfplan
+
+      - name: 'Terraform Apply'
+        run: terraform apply -auto-approve tfplan
+
