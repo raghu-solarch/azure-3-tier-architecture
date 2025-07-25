@@ -47,7 +47,7 @@ jobs:
         # Note: by default plan uses the dev configuration. In PRs you can override this if needed.
 
       - name: 'Upload Plan'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tfplan
           path: tfplan
