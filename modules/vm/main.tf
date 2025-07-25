@@ -23,7 +23,7 @@ resource "azurerm_network_interface" "this" {
 
 # Optionally associate an NSG with the NIC
 resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
-  count                    = var.nsg_id == null ? 0 : 1
+  count                    = can(var.nsg_id) && var.nsg_id != "" ? 1: 0
   network_interface_id     = azurerm_network_interface.this.id
   network_security_group_id = var.nsg_id
 }
