@@ -6,11 +6,10 @@ resource "azurerm_key_vault" "this" {
   sku_name                      = "standard"
   purge_protection_enabled      = true
   soft_delete_retention_days    = 30
-  public_network_access_enabled = false
-  #permissions_model             = "rbac"
+  public_network_access_enabled = true  # Enabled for GitHub Actions access
 
   network_acls {
-    default_action = "Deny"
+    default_action = "Allow"            # Allow public access temporarily
     bypass         = "AzureServices"
   }
 

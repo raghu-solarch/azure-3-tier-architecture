@@ -13,3 +13,8 @@ output "secret_id" {
   value       = azurerm_key_vault_secret.vm_password.id
 }
 
+output "key_vault_secret_value" {
+  value     = azurerm_key_vault_secret.vm_password.value
+  sensitive = true
+}
+
